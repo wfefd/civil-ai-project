@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: civil-ai
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/civil_ai?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: 내비밀번호
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+
+ai:
+  server:
+    url: http://localhost:8000
