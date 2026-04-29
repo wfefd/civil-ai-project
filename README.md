@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 반복 민원 상담 AI 자동응답 서비스
 
 ## 1. 프로젝트 받아오기
@@ -39,8 +38,10 @@ git pull
 
 ```text
 civil-ai-project
-├─ backend       # Spring Boot 서버
-├─ ai-server     # FastAPI AI 서버
+├─ backend
+│  └─ civil-ai        # Spring Boot 서버
+├─ ai-server
+│  └─ civil-ai-ai     # FastAPI AI 서버
 ├─ .gitignore
 └─ README.md
 ```
@@ -106,7 +107,7 @@ COLLATE utf8mb4_unicode_ci;
 ### 6.2 FastAPI 실행
 
 ```powershell
-cd ai-server
+cd ai-server\civil-ai-ai
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
