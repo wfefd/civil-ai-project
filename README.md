@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 반복 민원 상담 AI 자동응답 서비스
 
 ## 1. 프로젝트 받아오기
@@ -404,6 +403,3 @@ FastAPI와 Spring Boot는 각각 다른 포트에서 실행됩니다.
 FastAPI      : http://localhost:8000
 Spring Boot  : http://localhost:8080
 ```
-=======
-# civil-ai-project
->>>>>>> c899fb41f26598948fdc7cb9323ac21f3a2d3a12
