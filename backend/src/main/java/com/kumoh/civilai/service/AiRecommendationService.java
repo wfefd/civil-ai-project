@@ -30,6 +30,12 @@ public class AiRecommendationService {
                 inquiry.getContent()
         );
 
+
+        System.out.println("AI 응답 draftAnswer = " + aiResponse.getDraftAnswer());
+        System.out.println("AI 응답 category = " + aiResponse.getCategory());
+        System.out.println("AI 응답 confidence = " + aiResponse.getConfidence());
+        System.out.println("AI 응답 sourceSummary = " + aiResponse.getSourceSummary());
+
         AiRecommendation recommendation = new AiRecommendation(
                 inquiry,
                 aiResponse.getDraftAnswer(),

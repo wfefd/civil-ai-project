@@ -26,6 +26,7 @@ def health_check():
 
 @app.post("/api/ai/draft", response_model=AiDraftResponse)
 def create_ai_draft(request: AiDraftRequest):
+    print("FastAPI received:", request)
     return rag_engine.create_draft(request)
 
 
