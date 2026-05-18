@@ -25,16 +25,22 @@ public class AiRecommendationService {
         Inquiry inquiry = inquiryRepository.findById(inquiryId)
                 .orElseThrow(() -> new IllegalArgumentException("문의를 찾을 수 없습니다. id=" + inquiryId));
 
+        // 이미 최종 답변이 완료된 문의는 AI 초안 재생성 불가
+        if (inquiry.getStatus() == InquiryStatus.COMPLETED) {
+            throw new IllegalStateException("이미 최종 답변이 완료된 문의입니다.");
+        }
+
+        // 이미 AI 초안이 있으면 새로 생성하지 않고 기존 초안 반환
+        return aiRecommendationRepository.findByInquiryId(inquiryId)
+                .map(AiRecommendationResponse::new)
+                .orElseGet(() -> createNewRecommendation(inquiry));
+    }
+
+    private AiRecommendationResponse createNewRecommendation(Inquiry inquiry) {
         AiDraftResponse aiResponse = aiServerClient.requestDraft(
                 inquiry.getId(),
                 inquiry.getContent()
         );
-
-
-        System.out.println("AI 응답 draftAnswer = " + aiResponse.getDraftAnswer());
-        System.out.println("AI 응답 category = " + aiResponse.getCategory());
-        System.out.println("AI 응답 confidence = " + aiResponse.getConfidence());
-        System.out.println("AI 응답 sourceSummary = " + aiResponse.getSourceSummary());
 
         AiRecommendation recommendation = new AiRecommendation(
                 inquiry,
