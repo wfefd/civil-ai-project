@@ -12,7 +12,12 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 import java.util.HashSet;
 import java.util.Set;
+import org.jsoup.Connection;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +31,8 @@ public class SchoolNoticeCrawlerService {
     private static final int PAGE_LIMIT = 10;
 
     private final SourceDocumentRepository sourceDocumentRepository;
-
+    private final AttachmentTextExtractorService attachmentTextExtractorService;
+    private static final int MAX_ATTACHMENT_SIZE_BYTES = 20 * 1024 * 1024;
     /**
      * 범위 지정 공지사항 크롤링
      *
@@ -242,15 +248,16 @@ public class SchoolNoticeCrawlerService {
             String author = extractAuthor(fullText);
             String postedDate = extractPostedDate(fullText);
             String noticeBody = extractNoticeBody(fullText);
+            String attachmentText = crawlAttachmentTexts(detailDocument, detailUrl);
 
             String content = buildNoticeContent(
                     title,
                     noticeBody,
+                    attachmentText,
                     category,
                     author,
                     postedDate
             );
-
             return new SourceDocument(
                     DocumentSource.NOTICE,
                     "금오공과대학교",
@@ -275,12 +282,14 @@ public class SchoolNoticeCrawlerService {
     private String buildNoticeContent(
             String title,
             String body,
+            String attachmentText,
             String category,
             String author,
             String postedDate
     ) {
         String cleanTitle = cleanText(title);
         String cleanBody = cleanText(body);
+        String cleanAttachmentText = cleanAttachmentText(attachmentText);
         String cleanCategory = normalizeUnknown(category);
         String cleanAuthor = normalizeUnknown(author);
         String cleanPostedDate = normalizeUnknown(postedDate);
@@ -312,12 +321,17 @@ public class SchoolNoticeCrawlerService {
         if (!cleanBody.isBlank()) {
             sb.append("[본문]\n")
                     .append(cleanBody)
+                    .append("\n\n");
+        }
+
+        if (!cleanAttachmentText.isBlank()) {
+            sb.append("[첨부파일 내용]\n")
+                    .append(cleanAttachmentText)
                     .append("\n");
         }
 
         return sb.toString().trim();
     }
-
     private String extractTitle(Document document, String fullText) {
         String title = document.select(
                 "h4, h3, .view-title, .board-view-title, .bbs-title"
@@ -600,6 +614,286 @@ public class SchoolNoticeCrawlerService {
             int savedCount,
             int skippedCount,
             int failedCount
+    ) {
+    }
+    private String crawlAttachmentTexts(Document document, String detailUrl) {
+        Elements links = extractAttachmentLinks(document);
+
+        if (links.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        Set<String> visitedFileUrls = new HashSet<>();
+
+        for (Element link : links) {
+            try {
+                String fileUrl = link.absUrl("href");
+
+                if (fileUrl == null || fileUrl.isBlank()) {
+                    continue;
+                }
+
+                if (visitedFileUrls.contains(fileUrl)) {
+                    continue;
+                }
+
+                visitedFileUrls.add(fileUrl);
+
+                String fileName = extractFileName(link, fileUrl);
+
+                if (!isSupportedAttachmentCandidate(fileName, fileUrl)) {
+                    continue;
+                }
+
+                DownloadedAttachment downloadedAttachment = downloadAttachment(fileUrl, detailUrl, fileName);
+
+                if (downloadedAttachment.fileBytes() == null
+                        || downloadedAttachment.fileBytes().length == 0) {
+                    continue;
+                }
+
+                if (downloadedAttachment.fileBytes().length > MAX_ATTACHMENT_SIZE_BYTES) {
+                    System.out.println("첨부파일 크기 초과로 스킵 fileName="
+                            + downloadedAttachment.fileName()
+                            + ", size="
+                            + downloadedAttachment.fileBytes().length);
+                    continue;
+                }
+
+                String extractedText = attachmentTextExtractorService.extractText(
+                        downloadedAttachment.fileName(),
+                        downloadedAttachment.fileBytes()
+                );
+
+                if (extractedText == null || extractedText.isBlank()) {
+                    continue;
+                }
+
+                sb.append("[첨부파일: ")
+                        .append(downloadedAttachment.fileName())
+                        .append("]\n")
+                        .append(extractedText)
+                        .append("\n\n");
+
+            } catch (Exception e) {
+                System.out.println("첨부파일 처리 실패 detailUrl=" + detailUrl + ", reason=" + e.getMessage());
+            }
+        }
+
+        return cleanAttachmentText(sb.toString());
+    }
+
+    private Elements extractAttachmentLinks(Document document) {
+        /*
+         * 학교 사이트 첨부파일 링크는 꼭 .pdf로 끝나지 않을 수 있다.
+         * download, attach, file 키워드와 파일 확장자를 함께 본다.
+         */
+        return document.select(
+                "a[href*='download'], " +
+                        "a[href*='attach'], " +
+                        "a[href*='file'], " +
+                        "a[href$='.pdf'], " +
+                        "a[href$='.hwp'], " +
+                        "a[href$='.hwpx'], " +
+                        "a[href$='.docx'], " +
+                        "a[href$='.txt'], " +
+                        "a[href$='.png'], " +
+                        "a[href$='.jpg'], " +
+                        "a[href$='.jpeg']"
+        );
+    }
+
+    private DownloadedAttachment downloadAttachment(String fileUrl, String referrerUrl, String fallbackFileName) {
+        try {
+            Connection.Response response = Jsoup.connect(fileUrl)
+                    .userAgent("Mozilla/5.0")
+                    .referrer(referrerUrl)
+                    .ignoreContentType(true)
+                    .timeout(20000)
+                    .execute();
+
+            byte[] fileBytes = response.bodyAsBytes();
+
+            String fileName = extractFileNameFromContentDisposition(
+                    response.header("Content-Disposition")
+            );
+
+            if (fileName.isBlank()) {
+                fileName = fallbackFileName;
+            }
+
+            fileName = cleanFileName(fileName);
+
+            return new DownloadedAttachment(fileName, fileBytes);
+
+        } catch (Exception e) {
+            System.out.println("첨부파일 다운로드 실패 fileUrl=" + fileUrl + ", reason=" + e.getMessage());
+            return new DownloadedAttachment(fallbackFileName, new byte[0]);
+        }
+    }
+
+    private String extractFileName(Element link, String fileUrl) {
+        String text = cleanText(link.text());
+
+        if (looksLikeFileName(text)) {
+            return cleanFileName(text);
+        }
+
+        String title = cleanText(link.attr("title"));
+
+        if (looksLikeFileName(title)) {
+            return cleanFileName(title);
+        }
+
+        return extractFileNameFromUrl(fileUrl);
+    }
+
+    private String extractFileNameFromUrl(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return "attachment";
+        }
+
+        try {
+            String decodedUrl = URLDecoder.decode(fileUrl, StandardCharsets.UTF_8);
+            int slashIndex = decodedUrl.lastIndexOf("/");
+
+            if (slashIndex >= 0 && slashIndex < decodedUrl.length() - 1) {
+                String lastPart = decodedUrl.substring(slashIndex + 1);
+
+                int queryIndex = lastPart.indexOf("?");
+
+                if (queryIndex >= 0) {
+                    lastPart = lastPart.substring(0, queryIndex);
+                }
+
+                if (!lastPart.isBlank()) {
+                    return cleanFileName(lastPart);
+                }
+            }
+
+        } catch (Exception ignored) {
+        }
+
+        return "attachment";
+    }
+
+    private String extractFileNameFromContentDisposition(String contentDisposition) {
+        if (contentDisposition == null || contentDisposition.isBlank()) {
+            return "";
+        }
+
+        /*
+         * 예:
+         * Content-Disposition: attachment; filename="abc.pdf"
+         * Content-Disposition: attachment; filename*=UTF-8''%EC%9E%90%EB%A3%8C.pdf
+         */
+        String lower = contentDisposition.toLowerCase();
+
+        try {
+            if (lower.contains("filename*=")) {
+                String value = contentDisposition.substring(lower.indexOf("filename*=") + "filename*=".length());
+                value = value.replace("UTF-8''", "")
+                        .replace("utf-8''", "")
+                        .replace("\"", "")
+                        .trim();
+
+                int semicolonIndex = value.indexOf(";");
+
+                if (semicolonIndex >= 0) {
+                    value = value.substring(0, semicolonIndex);
+                }
+
+                return URLDecoder.decode(value, StandardCharsets.UTF_8);
+            }
+
+            if (lower.contains("filename=")) {
+                String value = contentDisposition.substring(lower.indexOf("filename=") + "filename=".length());
+                value = value.replace("\"", "").trim();
+
+                int semicolonIndex = value.indexOf(";");
+
+                if (semicolonIndex >= 0) {
+                    value = value.substring(0, semicolonIndex);
+                }
+
+                return URLDecoder.decode(value, StandardCharsets.UTF_8);
+            }
+
+        } catch (Exception e) {
+            System.out.println("첨부파일명 파싱 실패 Content-Disposition=" + contentDisposition);
+        }
+
+        return "";
+    }
+
+    private boolean isSupportedAttachmentCandidate(String fileName, String fileUrl) {
+        String target = (fileName + " " + fileUrl).toLowerCase();
+
+        return target.contains(".pdf")
+                || target.contains(".docx")
+                || target.contains(".txt")
+                || target.contains(".hwpx")
+                || target.contains(".hwp")
+                || target.contains(".png")
+                || target.contains(".jpg")
+                || target.contains(".jpeg")
+                || target.contains("download")
+                || target.contains("attach");
+    }
+
+    private boolean looksLikeFileName(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+
+        String lower = text.toLowerCase();
+
+        return lower.endsWith(".pdf")
+                || lower.endsWith(".docx")
+                || lower.endsWith(".txt")
+                || lower.endsWith(".hwpx")
+                || lower.endsWith(".hwp")
+                || lower.endsWith(".png")
+                || lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg");
+    }
+
+    private String cleanFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return "attachment";
+        }
+
+        return fileName
+                .replace("\\", "_")
+                .replace("/", "_")
+                .replace(":", "_")
+                .replace("*", "_")
+                .replace("?", "_")
+                .replace("\"", "_")
+                .replace("<", "_")
+                .replace(">", "_")
+                .replace("|", "_")
+                .trim();
+    }
+
+    private String cleanAttachmentText(String text) {
+        if (text == null) {
+            return "";
+        }
+
+        return text
+                .replace("\u00A0", " ")
+                .replaceAll("[ \\t]+", " ")
+                .replaceAll("\\r\\n", "\n")
+                .replaceAll("\\r", "\n")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
+    }
+
+    private record DownloadedAttachment(
+            String fileName,
+            byte[] fileBytes
     ) {
     }
 }
