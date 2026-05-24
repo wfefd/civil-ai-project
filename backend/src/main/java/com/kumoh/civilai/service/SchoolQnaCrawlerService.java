@@ -12,12 +12,14 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import java.util.HashSet;
+import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class SchoolQnaCrawlerService {
@@ -60,6 +62,12 @@ public class SchoolQnaCrawlerService {
 
         int offset = 0;
 
+        /*
+         * QnA 목록 안에서 같은 articleNo가 여러 번 잡힐 수 있으므로
+         * 이번 크롤링 실행 중 이미 처리한 articleNo를 기억한다.
+         */
+        Set<String> visitedArticleNos = new HashSet<>();
+
         while (true) {
             try {
                 String listUrl = buildListUrl(offset);
@@ -72,14 +80,10 @@ public class SchoolQnaCrawlerService {
 
                 System.out.println(
                         "QnA 목록 확인 offset=" + offset
-                                + ", linkCount=" + links.size()
+                                + ", rawLinkCount=" + links.size()
                                 + ", title=" + listDocument.title()
                 );
 
-                /*
-                 * 핵심:
-                 * 목록 페이지에서는 로그인 문구보다 게시글 링크 존재 여부를 우선한다.
-                 */
                 if (links.isEmpty()) {
                     System.out.println("더 이상 QnA 게시글 링크가 없습니다. offset=" + offset);
 
@@ -90,19 +94,45 @@ public class SchoolQnaCrawlerService {
                     break;
                 }
 
-                System.out.println("QnA 목록 크롤링 시작 offset=" + offset + ", linkCount=" + links.size());
+                int pageSavedCount = 0;
+                int pageSkippedCount = 0;
+                int pageFailedCount = 0;
 
                 for (Element link : links) {
+                    String rawUrl = "";
+                    String articleNo = "";
                     String detailUrl = "";
 
                     try {
-                        detailUrl = link.absUrl("href");
+                        rawUrl = link.absUrl("href");
+                        articleNo = extractArticleNo(rawUrl);
 
-                        if (!isValidQnaDetailUrl(detailUrl)) {
+                        if (articleNo.isBlank()) {
+                            pageFailedCount++;
+                            failedCount++;
                             continue;
                         }
 
+                        /*
+                         * 핵심 1:
+                         * 같은 articleNo가 같은 페이지 또는 다른 페이지에서 반복되면 건너뛴다.
+                         */
+                        if (visitedArticleNos.contains(articleNo)) {
+                            pageSkippedCount++;
+                            skippedCount++;
+                            continue;
+                        }
+
+                        visitedArticleNos.add(articleNo);
+
+                        /*
+                         * 핵심 2:
+                         * rawUrl 그대로 저장하지 말고 canonical URL로 통일한다.
+                         */
+                        detailUrl = buildCanonicalQnaDetailUrl(articleNo);
+
                         if (sourceDocumentRepository.existsByUrl(detailUrl)) {
+                            pageSkippedCount++;
                             skippedCount++;
                             continue;
                         }
@@ -110,26 +140,33 @@ public class SchoolQnaCrawlerService {
                         SourceDocument qna = crawlQnaDetail(detailUrl);
                         sourceDocumentRepository.save(qna);
 
+                        pageSavedCount++;
                         savedCount++;
 
                         sleep(DETAIL_DELAY_MS);
 
                     } catch (Exception e) {
+                        pageFailedCount++;
                         failedCount++;
                         System.out.println(
-                                "QnA 상세 크롤링 실패 detailUrl="
-                                        + detailUrl
-                                        + ", reason="
-                                        + e.getMessage()
+                                "QnA 상세 크롤링 실패"
+                                        + ", articleNo=" + articleNo
+                                        + ", rawUrl=" + rawUrl
+                                        + ", detailUrl=" + detailUrl
+                                        + ", reason=" + e.getMessage()
                         );
                     }
                 }
 
                 System.out.println(
                         "QnA 목록 처리 완료 offset=" + offset
-                                + ", saved=" + savedCount
-                                + ", skipped=" + skippedCount
-                                + ", failed=" + failedCount
+                                + ", pageSaved=" + pageSavedCount
+                                + ", pageSkipped=" + pageSkippedCount
+                                + ", pageFailed=" + pageFailedCount
+                                + ", totalSaved=" + savedCount
+                                + ", totalSkipped=" + skippedCount
+                                + ", totalFailed=" + failedCount
+                                + ", visitedArticleNos=" + visitedArticleNos.size()
                 );
 
                 offset += PAGE_LIMIT;
@@ -164,6 +201,8 @@ public class SchoolQnaCrawlerService {
         int skippedCount = 0;
         int failedCount = 0;
 
+        Set<String> visitedArticleNos = new HashSet<>();
+
         for (int offset = startOffset; offset <= endOffset; offset += PAGE_LIMIT) {
             try {
                 String listUrl = buildListUrl(offset);
@@ -176,28 +215,31 @@ public class SchoolQnaCrawlerService {
 
                 if (links.isEmpty()) {
                     System.out.println("더 이상 QnA 게시글 링크가 없습니다. offset=" + offset);
-
-                    if (isRealLoginPage(listDocument)) {
-                        System.out.println("실제 로그인 페이지로 판단됩니다. qnaCookie를 확인하세요.");
-                    }
-
-                    break;
-                }
-
-
-
-                if (links.isEmpty()) {
-                    System.out.println("더 이상 QnA 게시글이 없습니다. offset=" + offset);
                     break;
                 }
 
                 for (Element link : links) {
-                    try {
-                        String detailUrl = link.absUrl("href");
+                    String rawUrl = "";
+                    String articleNo = "";
+                    String detailUrl = "";
 
-                        if (!isValidQnaDetailUrl(detailUrl)) {
+                    try {
+                        rawUrl = link.absUrl("href");
+                        articleNo = extractArticleNo(rawUrl);
+
+                        if (articleNo.isBlank()) {
+                            failedCount++;
                             continue;
                         }
+
+                        if (visitedArticleNos.contains(articleNo)) {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        visitedArticleNos.add(articleNo);
+
+                        detailUrl = buildCanonicalQnaDetailUrl(articleNo);
 
                         if (sourceDocumentRepository.existsByUrl(detailUrl)) {
                             skippedCount++;
@@ -213,7 +255,13 @@ public class SchoolQnaCrawlerService {
 
                     } catch (Exception e) {
                         failedCount++;
-                        System.out.println("QnA 상세 크롤링 실패: " + e.getMessage());
+                        System.out.println(
+                                "QnA 상세 크롤링 실패"
+                                        + ", articleNo=" + articleNo
+                                        + ", rawUrl=" + rawUrl
+                                        + ", detailUrl=" + detailUrl
+                                        + ", reason=" + e.getMessage()
+                        );
                     }
                 }
 
@@ -222,6 +270,7 @@ public class SchoolQnaCrawlerService {
                                 + ", saved=" + savedCount
                                 + ", skipped=" + skippedCount
                                 + ", failed=" + failedCount
+                                + ", visitedArticleNos=" + visitedArticleNos.size()
                 );
 
                 sleep(PAGE_DELAY_MS);
@@ -240,7 +289,11 @@ public class SchoolQnaCrawlerService {
                 "QnA 크롤링이 완료되었습니다."
         );
     }
-
+    private String buildCanonicalQnaDetailUrl(String articleNo) {
+        return QNA_LIST_URL
+                + "?mode=view"
+                + "&articleNo=" + articleNo;
+    }
     private SourceDocument crawlQnaDetail(String detailUrl) {
         try {
             Document detailDocument = createHtmlConnection(detailUrl)
