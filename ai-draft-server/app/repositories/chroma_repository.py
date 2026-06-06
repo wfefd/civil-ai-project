@@ -4,12 +4,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from app.core.config import REFERENCE_DATA_SOURCE
+from app.core.config import EMBEDDING_BACKEND, REFERENCE_DATA_SOURCE
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 CHROMA_PATH = BASE_DIR / "data" / "chroma_db"
-DEFAULT_COLLECTION_NAME = f"reference_documents_{REFERENCE_DATA_SOURCE}"
+DEFAULT_COLLECTION_NAME = f"reference_documents_{REFERENCE_DATA_SOURCE}_{EMBEDDING_BACKEND}_chunked"
 COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", DEFAULT_COLLECTION_NAME)
 
 
