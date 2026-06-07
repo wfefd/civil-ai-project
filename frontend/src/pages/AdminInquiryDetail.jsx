@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import api from "../api/api";
 
-function AdminInquiryDetail({ inquiryId }) {
+function AdminInquiryDetail() {
+    const { id } = useParams();
+    const inquiryId = id;
+
     const [inquiry, setInquiry] = useState(null);
     const [aiDraft, setAiDraft] = useState(null);
     const [finalAnswer, setFinalAnswer] = useState("");

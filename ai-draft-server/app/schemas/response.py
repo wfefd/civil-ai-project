@@ -10,7 +10,7 @@ class ReferenceItem(BaseModel):
     source_id: int = Field(..., alias="sourceId", description="Reference source ID")
     title: str = Field(..., description="Reference title")
     score: float = Field(..., ge=0.0, le=1.0, description="Reference relevance score")
-
+    content: Optional[str] = Field(default=None, description="Reference chunk content")
 
 class DraftResponse(BaseModel):
     model_config = ConfigDict(

@@ -26,12 +26,14 @@ public class AiServerClient {
         System.out.println("AI 서버 요청 inquiryId = " + inquiryId);
         System.out.println("AI 서버 요청 question = " + question);
 
-        String url = aiServerUrl + "/api/ai/draft";
+        String url = aiServerUrl + "/ai/draft";
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("inquiryId", inquiryId);
-        requestBody.put("question", question);
+        requestBody.put("title", "학생 문의");
+        requestBody.put("content", question);
 
+        System.out.println("AI 서버 요청 url = " + url);
         System.out.println("AI 서버 요청 body = " + requestBody);
 
         HttpHeaders headers = new HttpHeaders();
@@ -53,9 +55,12 @@ public class AiServerClient {
             throw new IllegalStateException("AI 서버 응답 body가 비어 있습니다.");
         }
 
+        System.out.println("AI 응답 inquiryId = " + body.getInquiryId());
+        System.out.println("AI 응답 normalizedQuestion = " + body.getNormalizedQuestion());
+        System.out.println("AI 응답 predictedCategory = " + body.getPredictedCategory());
+        System.out.println("AI 응답 categoryScore = " + body.getCategoryScore());
         System.out.println("AI 응답 draftAnswer = " + body.getDraftAnswer());
-        System.out.println("AI 응답 category = " + body.getCategory());
-        System.out.println("AI 응답 confidence = " + body.getConfidence());
+        System.out.println("AI 응답 status = " + body.getStatus());
         System.out.println("AI 응답 sourceSummary = " + body.getSourceSummary());
 
         return body;

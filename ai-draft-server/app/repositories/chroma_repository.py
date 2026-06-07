@@ -75,6 +75,15 @@ class ChromaRepository:
     def is_seeded(self) -> bool:
         collection = self._get_collection()
         return collection.count() > 0
+    def count_documents(self) -> int:
+        collection = self._get_collection()
+        return collection.count()
+
+    def get_collection_name(self) -> str:
+        return COLLECTION_NAME
+
+    def get_chroma_path(self) -> str:
+        return str(CHROMA_PATH)
 
     def reset_collection(self) -> None:
         client = self._get_client()
@@ -84,7 +93,7 @@ class ChromaRepository:
             pass
         self._collection = None
         self._get_collection()
-
+   
     def _get_client(self) -> Any:
         if self._client is not None:
             return self._client

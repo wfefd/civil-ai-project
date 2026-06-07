@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/api";
 
-function AdminInquiryList({ onSelectInquiry }) {
+function AdminInquiryList() {
     const [inquiries, setInquiries] = useState([]);
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const fetchInquiries = async () => {
         try {
@@ -40,7 +42,7 @@ function AdminInquiryList({ onSelectInquiry }) {
                     <button
                         key={inquiry.id}
                         className="inquiry-item"
-                        onClick={() => onSelectInquiry(inquiry.id)}
+                        onClick={() => navigate(`/admin/inquiries/${inquiry.id}`)}
                     >
                         <div className="inquiry-title">
                             #{inquiry.id} {inquiry.category || "미분류"}

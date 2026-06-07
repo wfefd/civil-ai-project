@@ -46,20 +46,53 @@ def seed_chroma_from_source(force: bool = False) -> int:
     print(f"Mapped source rows into {len(documents)} Chroma documents/chunks.")
 
     total_count = len(documents)
+    print(f"Total documents to seed: {total_count}", flush=True)
+
     for start_index in range(0, total_count, UPSERT_BATCH_SIZE):
         batch = documents[start_index:start_index + UPSERT_BATCH_SIZE]
+
+        print(
+            f"[DEBUG] Batch start: {start_index}, batch size: {len(batch)}",
+            flush=True
+        )
+
         ids = [item["id"] for item in batch]
         contents = [item["document"] for item in batch]
         metadatas = [item["metadata"] for item in batch]
-        embeddings = embedding_service.embed_documents(contents)
 
-        chroma_repository.upsert_documents(
-            ids=ids,
-            documents=contents,
-            metadatas=metadatas,
-            embeddings=embeddings,
-        )
-        print(f"Seeded {min(start_index + len(batch), total_count)}/{total_count} documents.")
+        print("[DEBUG] IDs / contents / metadatas prepared", flush=True)
+        print(f"[DEBUG] First id: {ids[0]}", flush=True)
+        print(f"[DEBUG] First content preview: {contents[0][:100]}", flush=True)
+
+        try:
+            print("[DEBUG] Embedding start", flush=True)
+
+            embeddings = embedding_service.embed_documents(contents)
+
+            print("[DEBUG] Embedding done", flush=True)
+
+            print("[DEBUG] Chroma upsert start", flush=True)
+
+            chroma_repository.upsert_documents(
+                ids=ids,
+                documents=contents,
+                metadatas=metadatas,
+                embeddings=embeddings,
+            )
+
+            print("[DEBUG] Chroma upsert done", flush=True)
+
+            print(
+                f"Seeded {min(start_index + len(batch), total_count)}/{total_count} documents.",
+                flush=True
+            )
+
+        except Exception as e:
+            print("[ERROR] Failed while seeding batch", flush=True)
+            print(f"[ERROR] start_index={start_index}", flush=True)
+            print(f"[ERROR] error type={type(e)}", flush=True)
+            print(f"[ERROR] error message={e}", flush=True)
+            raise
 
     return len(documents)
 

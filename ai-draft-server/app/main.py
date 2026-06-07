@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.draft import router as draft_router
+from app.api.backend_contract import router as backend_contract_router
 
 
 app = FastAPI(
@@ -10,6 +11,7 @@ app = FastAPI(
 )
 
 app.include_router(draft_router)
+app.include_router(backend_contract_router)
 
 
 @app.get("/")

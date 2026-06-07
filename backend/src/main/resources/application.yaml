@@ -22,3 +22,15 @@ spring:
 ai:
   server:
     url: http://localhost:8000
+
+crawler:
+  qna-cookie: "WMONID=jOVm4xrN_xZ; locale=ko; develop_preview_mode=N; ko_visited=20260607135529609001; _common_visited=20260607140609851001; JSESSIONID=EPDjoro8FF1fzFh6hs39nFEapY566eNPxVZjIxzNnnfh44NaTThuWb3z9uQCYid7.a3Vtb2hfaG9tZS9IT01FMQ=="
+
+document:
+  converter:
+    libre-office-path: "C:/Program Files/LibreOffice/program/soffice.exe"
+
+ocr:
+  tesseract:
+    datapath: "C:/Program Files/Tesseract-OCR/tessdata"
+    language: "kor+eng"
