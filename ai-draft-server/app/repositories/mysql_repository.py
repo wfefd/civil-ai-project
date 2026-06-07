@@ -8,6 +8,7 @@ from app.core.config import (
     MYSQL_HOST,
     MYSQL_PASSWORD,
     MYSQL_PORT,
+    MYSQL_SOURCE_POSTED_DATE_FROM,
     MYSQL_SOURCE_DOCUMENT_TABLE,
     MYSQL_USER,
 )
@@ -34,9 +35,15 @@ class MySQLRepository:
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 rows = self._fetch_source_documents(cursor)
+                faqs = self._to_faqs(rows)
+                notices = self._to_notices(rows)
+                print(
+                    "Loaded SOURCE_DOCUMENT rows from MySQL: "
+                    f"total={len(rows)}, qna={len(faqs)}, notice={len(notices)}"
+                )
                 return {
-                    "faqs": self._to_faqs(rows),
-                    "notices": self._to_notices(rows),
+                    "faqs": faqs,
+                    "notices": notices,
                     "histories": [],
                 }
 
@@ -55,8 +62,10 @@ class MySQLRepository:
                 `author`,
                 `posted_date`
             FROM `{table_name}`
-            WHERE LOWER(`source`) IN ('qna', 'notice')
-            """
+            WHERE LOWER(TRIM(`source`)) IN ('qna', 'notice')
+              AND `posted_date` >= %s
+            """,
+            (MYSQL_SOURCE_POSTED_DATE_FROM,),
         )
         return cursor.fetchall()
 
@@ -66,12 +75,16 @@ class MySQLRepository:
                 "id": row["id"],
                 "category": row.get("category") or "OTHER",
                 "question": row.get("title") or row.get("source_name") or "",
-                "answer": self._build_content(row),
+                "answer": row.get("content") or "",
                 "keywords": self._build_keywords(row),
                 "is_active": True,
+                "url": row.get("url") or "",
+                "author": row.get("author") or "",
+                "posted_date": str(row.get("posted_date") or ""),
+                "source_name": row.get("source_name") or "",
             }
             for row in rows
-            if str(row.get("source", "")).lower() == "qna"
+            if self._normalize_source(row) == "qna"
         ]
 
     def _to_notices(self, rows: list[dict]) -> list[dict]:
@@ -80,23 +93,21 @@ class MySQLRepository:
                 "id": row["id"],
                 "category": row.get("category") or "NOTICE",
                 "title": row.get("title") or row.get("source_name") or "",
-                "content": self._build_content(row),
+                "content": row.get("content") or "",
                 "keywords": self._build_keywords(row),
                 "is_active": True,
+                "url": row.get("url") or "",
+                "author": row.get("author") or "",
+                "posted_date": str(row.get("posted_date") or ""),
+                "source_name": row.get("source_name") or "",
             }
             for row in rows
-            if str(row.get("source", "")).lower() == "notice"
+            if self._normalize_source(row) == "notice"
         ]
 
     @staticmethod
-    def _build_content(row: dict) -> str:
-        parts = [
-            row.get("content") or "",
-            f"URL: {row['url']}" if row.get("url") else "",
-            f"Author: {row['author']}" if row.get("author") else "",
-            f"Posted Date: {row['posted_date']}" if row.get("posted_date") else "",
-        ]
-        return "\n".join(part for part in parts if part)
+    def _normalize_source(row: dict) -> str:
+        return str(row.get("source", "")).strip().lower()
 
     @staticmethod
     def _build_keywords(row: dict) -> list[str]:
