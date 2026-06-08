@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../api/api";
 
-function AdminInquiryDetail() {
+function AdminInquiryDetail({ onUpdated }) {
     const { id } = useParams();
     const inquiryId = id;
 
@@ -10,6 +10,7 @@ function AdminInquiryDetail() {
     const [aiDraft, setAiDraft] = useState(null);
     const [finalAnswer, setFinalAnswer] = useState("");
     const [reviewerName, setReviewerName] = useState("교직원A");
+    const [reusableAnswers, setReusableAnswers] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const fetchInquiry = async () => {
@@ -25,10 +26,20 @@ function AdminInquiryDetail() {
             );
 
             setAiDraft(response.data);
-            setFinalAnswer(response.data.draftAnswer);
+            setFinalAnswer(response.data.draftAnswer || "");
         } catch (error) {
             setAiDraft(null);
             setFinalAnswer("");
+        }
+    };
+
+    const fetchReusableAnswers = async () => {
+        try {
+            const response = await api.get("/api/admin/reusable-answers/top");
+            setReusableAnswers(response.data);
+        } catch (error) {
+            console.error(error);
+            setReusableAnswers([]);
         }
     };
 
@@ -37,6 +48,7 @@ function AdminInquiryDetail() {
             setLoading(true);
             await fetchInquiry();
             await fetchAiDraft();
+            await fetchReusableAnswers();
         } catch (error) {
             console.error(error);
             alert(error.response?.data?.message || "문의 상세 조회에 실패했습니다.");
@@ -54,9 +66,13 @@ function AdminInquiryDetail() {
             );
 
             setAiDraft(response.data);
-            setFinalAnswer(response.data.draftAnswer);
+            setFinalAnswer(response.data.draftAnswer || "");
 
             await fetchInquiry();
+
+            if (onUpdated) {
+                onUpdated();
+            }
 
             alert("AI 답변 초안이 생성되었습니다.");
         } catch (error) {
@@ -68,10 +84,6 @@ function AdminInquiryDetail() {
     };
 
     const approveAnswer = async () => {
-        if (!aiDraft) {
-            alert("AI 답변 초안이 먼저 필요합니다.");
-            return;
-        }
 
         if (!finalAnswer.trim()) {
             alert("최종 답변 내용을 입력하세요.");
@@ -92,6 +104,11 @@ function AdminInquiryDetail() {
             });
 
             await fetchInquiry();
+            await fetchReusableAnswers();
+
+            if (onUpdated) {
+                onUpdated();
+            }
 
             alert("최종 답변이 승인되었습니다.");
         } catch (error) {
@@ -99,6 +116,19 @@ function AdminInquiryDetail() {
             alert(error.response?.data?.message || "최종 답변 승인에 실패했습니다.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const useReusableAnswer = (answer) => {
+        setFinalAnswer(answer || "");
+    };
+
+    const copyText = async (text) => {
+        try {
+            await navigator.clipboard.writeText(text || "");
+            alert("복사되었습니다.");
+        } catch (error) {
+            alert("복사에 실패했습니다.");
         }
     };
 
@@ -110,16 +140,18 @@ function AdminInquiryDetail() {
 
     if (loading && !inquiry) {
         return (
-            <div className="card">
-                <p>문의 상세 정보를 불러오는 중...</p>
+            <div className="chat-detail-loading">
+                <div className="sidebar-skeleton wide" />
+                <div className="sidebar-skeleton wide" />
+                <div className="sidebar-skeleton wide" />
             </div>
         );
     }
 
     if (!inquiry) {
         return (
-            <div className="card">
-                <p>문의 정보를 찾을 수 없습니다.</p>
+            <div className="chat-empty">
+                <h2>문의 정보를 찾을 수 없습니다.</h2>
             </div>
         );
     }
@@ -127,98 +159,168 @@ function AdminInquiryDetail() {
     const isCompleted = inquiry.status === "COMPLETED";
 
     return (
-        <div className="card detail-card">
-            <h2>문의 상세 및 교직원 승인</h2>
-
-            <div className="section">
-                <h3>1. 사용자 문의</h3>
-                <div className="info-box">
+        <div className="admin-chat-detail">
+            <div className="chat-detail-header">
+                <div>
+                    <h2>문의 #{inquiry.id}</h2>
                     <p>
-                        <strong>문의 ID:</strong> {inquiry.id}
+                        {inquiry.studentName} · {inquiry.studentNumber} ·{" "}
+                        {inquiry.category || "미분류"}
                     </p>
-                    <p>
-                        <strong>학생 이름:</strong> {inquiry.studentName}
-                    </p>
-                    <p>
-                        <strong>학번:</strong> {inquiry.studentNumber}
-                    </p>
-                    <p>
-                        <strong>상태:</strong>{" "}
-                        <span className={`status status-${inquiry.status}`}>
-                            {inquiry.status}
-                        </span>
-                    </p>
-                    <p>
-                        <strong>카테고리:</strong> {inquiry.category || "미분류"}
-                    </p>
-                    <p>
-                        <strong>문의 내용:</strong>
-                    </p>
-                    <div className="content-box">{inquiry.content}</div>
                 </div>
+
+                <span className={`status status-${inquiry.status}`}>
+                    {inquiry.status}
+                </span>
             </div>
 
-            <div className="section">
-                <h3>2. AI 답변 초안</h3>
+            <div className="admin-detail-grid">
+                <section className="chat-conversation">
+                    <div className="message-row user-message">
+                        <div className="message-avatar">학</div>
+                        <div className="message-content">
+                            <div className="message-name">학생 질문</div>
+                            <div className="message-bubble">{inquiry.content}</div>
 
-                {!aiDraft ? (
-                    <div className="empty-box">
-                        <p>아직 생성된 AI 답변 초안이 없습니다.</p>
-                        <button onClick={createAiDraft} disabled={isCompleted || loading}>
-                            AI 초안 생성
-                        </button>
+                            {!aiDraft && !isCompleted && (
+                                <button
+                                    className="inline-ai-button"
+                                    onClick={createAiDraft}
+                                    disabled={loading}
+                                >
+                                    {loading ? "직접 답변을 작성하거나, AI 초안 또는 반복 민원 답변을 참고하세요." : "AI 답변 초안 생성"}
+                                </button>
+                            )}
+                        </div>
                     </div>
-                ) : (
-                    <div className="info-box">
-                        <p>
-                            <strong>AI 분류:</strong> {aiDraft.category}
-                        </p>
-                        <p>
-                            <strong>신뢰도:</strong> {aiDraft.confidence}
-                        </p>
-                        <p>
-                            <strong>근거 요약:</strong>
-                        </p>
-                        <div className="content-box">{aiDraft.sourceSummary}</div>
-                        <p>
-                            <strong>AI 초안:</strong>
-                        </p>
-                        <div className="content-box">{aiDraft.draftAnswer}</div>
+
+                    {aiDraft && (
+                        <div className="message-row ai-message">
+                            <div className="message-avatar">AI</div>
+                            <div className="message-content">
+                                <div className="message-name">
+                                    AI 답변 초안
+                                    <button
+                                        className="copy-button"
+                                        onClick={() => copyText(aiDraft.draftAnswer)}
+                                    >
+                                        복사
+                                    </button>
+                                </div>
+
+                                <div className="message-bubble">{aiDraft.draftAnswer}</div>
+
+                                <div className="reference-box">
+                                    <div>
+                                        <strong>AI 분류</strong>
+                                        <span>{aiDraft.category}</span>
+                                    </div>
+                                    <div>
+                                        <strong>신뢰도</strong>
+                                        <span>{aiDraft.confidence}</span>
+                                    </div>
+                                    <div>
+                                        <strong>근거 요약</strong>
+                                        <pre>{aiDraft.sourceSummary}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="message-row admin-message">
+                        <div className="message-avatar">관</div>
+                        <div className="message-content">
+                            <div className="message-name">교직원 최종 답변</div>
+
+                            {isCompleted && (
+                                <div className="notice-box">
+                                    이 문의는 이미 최종 답변이 승인되었습니다.
+                                </div>
+                            )}
+
+                            <label>검토자 이름</label>
+                            <input
+                                value={reviewerName}
+                                onChange={(e) => setReviewerName(e.target.value)}
+                                disabled={isCompleted}
+                            />
+
+                            <label>최종 답변 내용</label>
+                            <textarea
+                                value={finalAnswer}
+                                onChange={(e) => setFinalAnswer(e.target.value)}
+                                disabled={isCompleted}
+                                placeholder="AI 초안 또는 반복 민원 답변을 참고하여 최종 답변을 작성하세요."
+                            />
+
+                            <div className="answer-actions">
+                                <button
+                                    className="copy-button"
+                                    onClick={() => copyText(finalAnswer)}
+                                    disabled={!finalAnswer}
+                                >
+                                    최종 답변 복사
+                                </button>
+
+                                <button
+                                    className="approve-button"
+                                    onClick={approveAnswer}
+                                    disabled={isCompleted || loading || !finalAnswer.trim()}
+                                >
+                                    {isCompleted ? "이미 승인 완료" : "최종 답변 승인"}
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                )}
-            </div>
+                </section>
 
-            <div className="section">
-                <h3>3. 교직원 최종 답변 승인</h3>
-
-                {isCompleted && (
-                    <div className="notice-box">
-                        이 문의는 이미 최종 답변이 승인되었습니다.
+                <aside className="reusable-panel">
+                    <div className="reusable-panel-header">
+                        <div>
+                            <h3>반복 민원 답변 TOP 10</h3>
+                            <p>교직원 승인 답변을 재사용할 수 있습니다.</p>
+                        </div>
+                        <button onClick={fetchReusableAnswers}>새로고침</button>
                     </div>
-                )}
 
-                <label>검토자 이름</label>
-                <input
-                    value={reviewerName}
-                    onChange={(e) => setReviewerName(e.target.value)}
-                    disabled={isCompleted}
-                />
+                    {reusableAnswers.length === 0 && (
+                        <div className="reusable-empty">
+                            아직 재사용 가능한 답변이 없습니다.
+                        </div>
+                    )}
 
-                <label>최종 답변 내용</label>
-                <textarea
-                    value={finalAnswer}
-                    onChange={(e) => setFinalAnswer(e.target.value)}
-                    disabled={isCompleted}
-                    placeholder="AI 초안을 검토한 뒤 최종 답변을 작성하세요."
-                />
+                    <div className="reusable-list">
+                        {reusableAnswers.map((item, index) => (
+                            <div key={item.id} className="reusable-card">
+                                <div className="reusable-rank">TOP {index + 1}</div>
 
-                <button
-                    className="approve-button"
-                    onClick={approveAnswer}
-                    disabled={isCompleted || !aiDraft || loading}
-                >
-                    {isCompleted ? "이미 승인 완료" : "최종 답변 승인"}
-                </button>
+                                <div className="reusable-category">
+                                    {item.category || "일반"} · {item.usedCount}회
+                                </div>
+
+                                <div className="reusable-question">
+                                    <strong>질문</strong>
+                                    <p>{item.question}</p>
+                                </div>
+
+                                <div className="reusable-answer">
+                                    <strong>답변</strong>
+                                    <p>{item.answer}</p>
+                                </div>
+
+                                <div className="reusable-actions">
+                                    <button onClick={() => useReusableAnswer(item.answer)}>
+                                        답변 사용
+                                    </button>
+                                    <button onClick={() => copyText(item.answer)}>
+                                        복사
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </aside>
             </div>
         </div>
     );

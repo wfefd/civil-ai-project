@@ -35,8 +35,8 @@ public class AnswerService {
             throw new IllegalStateException("이미 최종 답변이 존재합니다.");
         }
 
-        if (inquiry.getStatus() != InquiryStatus.AI_DRAFTED) {
-            throw new IllegalStateException("AI 답변 초안이 생성된 문의만 최종 승인할 수 있습니다.");
+        if (request.getFinalAnswer() == null || request.getFinalAnswer().trim().isEmpty()) {
+            throw new IllegalStateException("최종 답변 내용을 입력해야 합니다.");
         }
 
         AnswerHistory answerHistory = new AnswerHistory(
@@ -51,11 +51,14 @@ public class AnswerService {
 
         inquiry.updateStatus(InquiryStatus.COMPLETED);
 
-        indexAnswerHistory(savedAnswer);
+        try {
+            indexAnswerHistory(savedAnswer);
+        } catch (Exception e) {
+            System.out.println("AI 서버 HISTORY 적재 실패: " + e.getMessage());
+        }
 
         return new AnswerHistoryResponse(savedAnswer);
     }
-
     public AnswerHistoryResponse getAnswerByInquiryId(Long inquiryId) {
         AnswerHistory answerHistory = answerHistoryRepository.findByInquiryId(inquiryId)
                 .orElseThrow(() -> new IllegalArgumentException("최종 답변을 찾을 수 없습니다. inquiryId=" + inquiryId));

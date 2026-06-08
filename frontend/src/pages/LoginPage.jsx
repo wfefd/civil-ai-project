@@ -18,19 +18,31 @@ function LoginPage() {
 
     return (
         <main className="login-layout">
-            <div className="card login-card">
-                <h2>로그인</h2>
-                <p className="description">
-                    사용자 유형을 선택하여 시스템에 접속합니다.
+            <div className="login-card">
+                <div className="login-logo">Kumoh</div>
+
+                <h1>반복 민원 상담 AI 자동응답 서비스</h1>
+                <p>
+                    사용자 유형을 선택하여 로그인하세요.
                 </p>
 
-                <label>사용자 유형</label>
-                <select value={role} onChange={(e) => setRole(e.target.value)}>
-                    <option value="STUDENT">학생</option>
-                    <option value="ADMIN">관리자</option>
-                </select>
+                <div className="login-role-group">
+                    <button
+                        className={role === "STUDENT" ? "role-button active" : "role-button"}
+                        onClick={() => setRole("STUDENT")}
+                    >
+                        학생
+                    </button>
 
-                <button onClick={login}>
+                    <button
+                        className={role === "ADMIN" ? "role-button active" : "role-button"}
+                        onClick={() => setRole("ADMIN")}
+                    >
+                        관리자
+                    </button>
+                </div>
+
+                <button className="login-button" onClick={login}>
                     로그인
                 </button>
             </div>

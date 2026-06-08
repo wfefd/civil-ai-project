@@ -26,10 +26,16 @@ public class AnswerHistory {
 
     /**
      * 최종 답변 당시 사용자 질문
-     * 추후 AI 서버에 HISTORY 데이터로 전달하기 위해 저장
      */
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
+
+    /**
+     * 반복 민원 묶음을 위한 정규화된 질문
+     * 예: "계절학기 시작일이 언제인가요?" -> "계절학기시작일"
+     */
+    @Column(length = 500)
+    private String normalizedQuestion;
 
     /**
      * 교직원이 검토 및 승인한 최종 답변
@@ -39,7 +45,6 @@ public class AnswerHistory {
 
     /**
      * 문의 카테고리
-     * 예: 등록금, 장학, 휴복학, 수강신청 등
      */
     private String category;
 
@@ -64,6 +69,7 @@ public class AnswerHistory {
     ) {
         this.inquiry = inquiry;
         this.question = question;
+        this.normalizedQuestion = normalizeQuestion(question);
         this.finalAnswer = finalAnswer;
         this.category = category;
         this.reviewerName = reviewerName;
@@ -73,5 +79,38 @@ public class AnswerHistory {
 
     public void markIndexed() {
         this.indexed = true;
+    }
+
+    /**
+     * 기존 데이터 보정용
+     */
+    public void updateNormalizedQuestion() {
+        this.normalizedQuestion = normalizeQuestion(this.question);
+    }
+
+    public static String normalizeQuestion(String question) {
+        if (question == null) {
+            return "";
+        }
+
+        return question
+                .toLowerCase()
+                .replaceAll("\\s+", "")
+                .replaceAll("[?!.~,:;\"'()\\[\\]{}]", "")
+                .replace("알려주세요", "")
+                .replace("궁금합니다", "")
+                .replace("문의드립니다", "")
+                .replace("문의드려요", "")
+                .replace("언제인가요", "")
+                .replace("언제인가요?", "")
+                .replace("언제예요", "")
+                .replace("언제에요", "")
+                .replace("언제", "")
+                .replace("인가요", "")
+                .replace("되나요", "")
+                .replace("되요", "")
+                .replace("돼요", "")
+                .replace("요", "")
+                .trim();
     }
 }
