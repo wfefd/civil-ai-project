@@ -10,8 +10,8 @@ function StudentChatPage() {
     const [inquiries, setInquiries] = useState([]);
     const [filteredInquiries, setFilteredInquiries] = useState([]);
 
-    const [studentName, setStudentName] = useState("김형규");
-    const [studentNumber, setStudentNumber] = useState("20200369");
+    const studentName = localStorage.getItem("name") || "학생";
+    const studentNumber = localStorage.getItem("studentNumber") || "";
     const [content, setContent] = useState("");
 
     const [selectedInquiry, setSelectedInquiry] = useState(null);
@@ -25,19 +25,10 @@ function StudentChatPage() {
         try {
             setListLoading(true);
 
-            const response = await api.get("/api/inquiries");
+            const response = await api.get("/api/inquiries/my");
 
-            /**
-             * 현재 백엔드에 "내 문의만 조회" API가 없다면
-             * 일단 studentNumber로 프론트에서 필터링한다.
-             * 나중에는 GET /api/students/{studentNumber}/inquiries 로 바꾸는 게 맞다.
-             */
-            const myInquiries = response.data.filter(
-                (inquiry) => inquiry.studentNumber === studentNumber
-            );
-
-            setInquiries(myInquiries);
-            setFilteredInquiries(myInquiries);
+            setInquiries(response.data);
+            setFilteredInquiries(response.data);
         } catch (error) {
             console.error(error);
             alert(error.response?.data?.message || "문의 목록을 불러오지 못했습니다.");
@@ -83,8 +74,6 @@ function StudentChatPage() {
             setSubmitLoading(true);
 
             const response = await api.post("/api/inquiries", {
-                studentName,
-                studentNumber,
                 content,
             });
 
@@ -134,9 +123,14 @@ function StudentChatPage() {
     };
 
     const handleLogout = () => {
+        localStorage.removeItem("accessToken");
         localStorage.removeItem("isLoggedIn");
         localStorage.removeItem("role");
-        navigate("/login");
+        localStorage.removeItem("memberId");
+        localStorage.removeItem("loginId");
+        localStorage.removeItem("name");
+
+        navigate("/login", { replace: true });
     };
 
     useEffect(() => {

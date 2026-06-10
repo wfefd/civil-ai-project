@@ -1,5 +1,6 @@
 package com.kumoh.civilai.domain.inquiry;
 
+import com.kumoh.civilai.domain.member.Member;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -15,6 +16,11 @@ public class Inquiry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // 로그인한 회원과 문의 연결
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id")
+    private Member member;
 
     private String studentName;
 
@@ -33,6 +39,17 @@ public class Inquiry {
 
     private LocalDateTime updatedAt;
 
+    public Inquiry(Member member, String content) {
+        this.member = member;
+        this.studentName = member.getName();
+        this.studentNumber = member.getStudentNumber();
+        this.content = content;
+        this.status = InquiryStatus.RECEIVED;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 기존 데이터/테스트용 생성자는 당장은 남겨둬도 됨
     public Inquiry(String studentName, String studentNumber, String content) {
         this.studentName = studentName;
         this.studentNumber = studentNumber;
@@ -50,5 +67,9 @@ public class Inquiry {
     public void updateCategory(String category) {
         this.category = category;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isOwner(Long memberId) {
+        return this.member != null && this.member.getId().equals(memberId);
     }
 }

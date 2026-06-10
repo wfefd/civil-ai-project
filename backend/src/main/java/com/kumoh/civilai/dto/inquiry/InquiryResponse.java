@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class InquiryResponse {
 
     private final Long id;
+    private final Long memberId;
     private final String studentName;
     private final String studentNumber;
     private final String content;
@@ -20,6 +21,9 @@ public class InquiryResponse {
 
     public InquiryResponse(Inquiry inquiry) {
         this.id = inquiry.getId();
+        this.memberId = inquiry.getMember() != null
+                ? inquiry.getMember().getId()
+                : null;
         this.studentName = inquiry.getStudentName();
         this.studentNumber = inquiry.getStudentNumber();
         this.content = inquiry.getContent();

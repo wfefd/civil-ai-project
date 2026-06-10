@@ -43,8 +43,12 @@ function AdminChatPage() {
         );
     };
     const handleLogout = () => {
+        localStorage.removeItem("accessToken");
         localStorage.removeItem("isLoggedIn");
         localStorage.removeItem("role");
+        localStorage.removeItem("memberId");
+        localStorage.removeItem("loginId");
+        localStorage.removeItem("name");
         navigate("/login");
     };
     useEffect(() => {

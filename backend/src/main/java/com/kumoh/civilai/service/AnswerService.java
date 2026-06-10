@@ -59,9 +59,17 @@ public class AnswerService {
 
         return new AnswerHistoryResponse(savedAnswer);
     }
-    public AnswerHistoryResponse getAnswerByInquiryId(Long inquiryId) {
+    public AnswerHistoryResponse getAnswerByInquiryId(Long inquiryId, Long memberId, String role) {
         AnswerHistory answerHistory = answerHistoryRepository.findByInquiryId(inquiryId)
                 .orElseThrow(() -> new IllegalArgumentException("최종 답변을 찾을 수 없습니다. inquiryId=" + inquiryId));
+
+        Inquiry inquiry = answerHistory.getInquiry();
+
+        if ("STUDENT".equals(role)) {
+            if (inquiry.getMember() == null || !inquiry.getMember().getId().equals(memberId)) {
+                throw new IllegalStateException("본인의 문의 답변만 조회할 수 있습니다.");
+            }
+        }
 
         return new AnswerHistoryResponse(answerHistory);
     }

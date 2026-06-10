@@ -5,6 +5,7 @@ import com.kumoh.civilai.dto.answer.AnswerHistoryResponse;
 import com.kumoh.civilai.service.AnswerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -23,7 +24,18 @@ public class AnswerController {
     }
 
     @GetMapping
-    public AnswerHistoryResponse getAnswer(@PathVariable Long inquiryId) {
-        return answerService.getAnswerByInquiryId(inquiryId);
+    public AnswerHistoryResponse getAnswer(
+            @PathVariable Long inquiryId,
+            Authentication authentication
+    ) {
+        Long memberId = Long.parseLong(authentication.getName());
+
+        String role = authentication.getAuthorities()
+                .stream()
+                .findFirst()
+                .map(authority -> authority.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+
+        return answerService.getAnswerByInquiryId(inquiryId, memberId, role);
     }
 }
