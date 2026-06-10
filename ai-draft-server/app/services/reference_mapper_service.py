@@ -126,25 +126,30 @@ def notice_to_chroma_document(item: dict) -> list[dict]:
 
 
 def history_to_chroma_document(item: dict) -> dict:
+    question = item.get("inquiry_content", "")
+    answer = item.get("answer_content", "")
+    category = item.get("category") or "일반"
+    title = item.get("inquiry_title") or f"{category} 문의 최종 답변"
+
+    search_document = (
+        f"Source Type: HISTORY\n"
+        f"Category: {category}\n"
+        f"Question: {question}"
+    )
+
     return {
         "id": f"HISTORY-{item['id']}",
-        "document": (
-            f"Source Type: HISTORY\n"
-            f"Category: {item['category']}\n"
-            f"Inquiry Title: {item['inquiry_title']}\n"
-            f"Inquiry Content: {item['inquiry_content']}\n"
-            f"Answer Content: {item['answer_content']}\n"
-            f"Keywords: {_join_keywords(item['keywords'])}"
-        ),
+        "document": search_document,
         "metadata": {
             "source_type": "HISTORY",
             "source_id": item["id"],
-            "category": item["category"],
-            "title": item["inquiry_title"],
-            "is_active": item["is_active"],
+            "category": category,
+            "title": title,
+            "is_active": item.get("is_active", True),
+            "question": question,
+            "answer": answer,
         },
     }
-
 
 def map_seed_data_to_chroma_documents(
     faqs: list[dict],

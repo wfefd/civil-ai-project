@@ -10,6 +10,8 @@ import com.kumoh.civilai.dto.ai.AiDocumentIndexRequest;
 import com.kumoh.civilai.dto.ai.AiDocumentIndexResponse;
 import com.kumoh.civilai.dto.ai.AiHistoryIndexRequest;
 import com.kumoh.civilai.dto.ai.AiHistoryIndexResponse;
+import com.kumoh.civilai.dto.ai.AiSimilarHistoryRequest;
+import com.kumoh.civilai.dto.ai.AiSimilarHistoryResponse;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -109,6 +111,36 @@ public class AiServerClient {
 
         if (body == null) {
             throw new IllegalStateException("AI 서버 history 적재 응답 body가 비어 있습니다.");
+        }
+
+        return body;
+    }
+    public AiSimilarHistoryResponse findSimilarHistories(Long inquiryId, String question, Integer topK) {
+        String url = aiServerUrl + "/api/rag/similar-histories";
+
+        AiSimilarHistoryRequest request = new AiSimilarHistoryRequest(
+                inquiryId,
+                question,
+                topK
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+
+        HttpEntity<AiSimilarHistoryRequest> entity = new HttpEntity<>(request, headers);
+
+        ResponseEntity<AiSimilarHistoryResponse> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                AiSimilarHistoryResponse.class
+        );
+
+        AiSimilarHistoryResponse body = response.getBody();
+
+        if (body == null) {
+            throw new IllegalStateException("AI 서버 유사 답변 응답 body가 비어 있습니다.");
         }
 
         return body;

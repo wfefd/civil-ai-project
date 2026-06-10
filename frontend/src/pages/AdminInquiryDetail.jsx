@@ -10,8 +10,9 @@ function AdminInquiryDetail({ onUpdated }) {
     const [aiDraft, setAiDraft] = useState(null);
     const [finalAnswer, setFinalAnswer] = useState("");
     const [reviewerName, setReviewerName] = useState("교직원A");
-    const [reusableAnswers, setReusableAnswers] = useState([]);
+    const [similarAnswers, setSimilarAnswers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [similarLoading, setSimilarLoading] = useState(false);
 
     const fetchInquiry = async () => {
         const response = await api.get(`/api/inquiries/${inquiryId}`);
@@ -26,29 +27,39 @@ function AdminInquiryDetail({ onUpdated }) {
             );
 
             setAiDraft(response.data);
-            setFinalAnswer(response.data.draftAnswer || "");
+
+            if (response.data.draftAnswer) {
+                setFinalAnswer(response.data.draftAnswer);
+            }
         } catch (error) {
             setAiDraft(null);
-            setFinalAnswer("");
         }
     };
 
-    const fetchReusableAnswers = async () => {
+    const fetchSimilarAnswers = async () => {
         try {
-            const response = await api.get("/api/admin/reusable-answers/top");
-            setReusableAnswers(response.data);
+            setSimilarLoading(true);
+
+            const response = await api.get(
+                `/api/inquiries/${inquiryId}/similar-answers`
+            );
+
+            setSimilarAnswers(response.data.results || []);
         } catch (error) {
             console.error(error);
-            setReusableAnswers([]);
+            setSimilarAnswers([]);
+        } finally {
+            setSimilarLoading(false);
         }
     };
 
     const loadData = async () => {
         try {
             setLoading(true);
+
             await fetchInquiry();
             await fetchAiDraft();
-            await fetchReusableAnswers();
+            await fetchSimilarAnswers();
         } catch (error) {
             console.error(error);
             alert(error.response?.data?.message || "문의 상세 조회에 실패했습니다.");
@@ -84,7 +95,6 @@ function AdminInquiryDetail({ onUpdated }) {
     };
 
     const approveAnswer = async () => {
-
         if (!finalAnswer.trim()) {
             alert("최종 답변 내용을 입력하세요.");
             return;
@@ -104,7 +114,7 @@ function AdminInquiryDetail({ onUpdated }) {
             });
 
             await fetchInquiry();
-            await fetchReusableAnswers();
+            await fetchSimilarAnswers();
 
             if (onUpdated) {
                 onUpdated();
@@ -119,8 +129,20 @@ function AdminInquiryDetail({ onUpdated }) {
         }
     };
 
-    const useReusableAnswer = (answer) => {
+    const useSimilarAnswer = (answer) => {
         setFinalAnswer(answer || "");
+    };
+
+    const appendSimilarAnswer = (answer) => {
+        if (!answer) return;
+
+        setFinalAnswer((prev) => {
+            if (!prev.trim()) {
+                return answer;
+            }
+
+            return `${prev.trim()}\n\n${answer}`;
+        });
     };
 
     const copyText = async (text) => {
@@ -134,6 +156,9 @@ function AdminInquiryDetail({ onUpdated }) {
 
     useEffect(() => {
         if (inquiryId) {
+            setFinalAnswer("");
+            setAiDraft(null);
+            setSimilarAnswers([]);
             loadData();
         }
     }, [inquiryId]);
@@ -188,7 +213,7 @@ function AdminInquiryDetail({ onUpdated }) {
                                     onClick={createAiDraft}
                                     disabled={loading}
                                 >
-                                    {loading ? "직접 답변을 작성하거나, AI 초안 또는 반복 민원 답변을 참고하세요." : "AI 답변 초안 생성"}
+                                    {loading ? "AI 답변 초안 생성 중..." : "AI 답변 초안 생성"}
                                 </button>
                             )}
                         </div>
@@ -251,7 +276,7 @@ function AdminInquiryDetail({ onUpdated }) {
                                 value={finalAnswer}
                                 onChange={(e) => setFinalAnswer(e.target.value)}
                                 disabled={isCompleted}
-                                placeholder="AI 초안 또는 반복 민원 답변을 참고하여 최종 답변을 작성하세요."
+                                placeholder="직접 답변을 작성하거나, AI 초안 또는 유사 민원 추천 답변을 참고하세요."
                             />
 
                             <div className="answer-actions">
@@ -278,40 +303,54 @@ function AdminInquiryDetail({ onUpdated }) {
                 <aside className="reusable-panel">
                     <div className="reusable-panel-header">
                         <div>
-                            <h3>반복 민원 답변 TOP 10</h3>
-                            <p>교직원 승인 답변을 재사용할 수 있습니다.</p>
+                            <h3>유사 민원 추천 답변</h3>
+                            <p>현재 문의와 비슷한 과거 교직원 답변입니다.</p>
                         </div>
-                        <button onClick={fetchReusableAnswers}>새로고침</button>
+                        <button onClick={fetchSimilarAnswers} disabled={similarLoading}>
+                            {similarLoading ? "조회 중" : "새로고침"}
+                        </button>
                     </div>
 
-                    {reusableAnswers.length === 0 && (
+                    {similarLoading && (
                         <div className="reusable-empty">
-                            아직 재사용 가능한 답변이 없습니다.
+                            유사 답변을 불러오는 중입니다.
+                        </div>
+                    )}
+
+                    {!similarLoading && similarAnswers.length === 0 && (
+                        <div className="reusable-empty">
+                            유사한 과거 답변이 없습니다.
+                            <br />
+                            최종 답변을 승인하면 이후 추천 답변으로 활용될 수 있습니다.
                         </div>
                     )}
 
                     <div className="reusable-list">
-                        {reusableAnswers.map((item, index) => (
-                            <div key={item.id} className="reusable-card">
-                                <div className="reusable-rank">TOP {index + 1}</div>
+                        {similarAnswers.map((item, index) => (
+                            <div key={`${item.historyId}-${index}`} className="reusable-card">
+                                <div className="reusable-rank">추천 {index + 1}</div>
 
                                 <div className="reusable-category">
-                                    {item.category || "일반"} · {item.usedCount}회
+                                    {item.category || "일반"} · 유사도{" "}
+                                    {Math.round((item.score || 0) * 100)}%
                                 </div>
 
                                 <div className="reusable-question">
-                                    <strong>질문</strong>
-                                    <p>{item.question}</p>
+                                    <strong>유사 질문</strong>
+                                    <p>{item.question || "질문 정보 없음"}</p>
                                 </div>
 
                                 <div className="reusable-answer">
-                                    <strong>답변</strong>
+                                    <strong>교직원 답변</strong>
                                     <p>{item.answer}</p>
                                 </div>
 
                                 <div className="reusable-actions">
-                                    <button onClick={() => useReusableAnswer(item.answer)}>
+                                    <button onClick={() => useSimilarAnswer(item.answer)}>
                                         답변 사용
+                                    </button>
+                                    <button onClick={() => appendSimilarAnswer(item.answer)}>
+                                        아래 추가
                                     </button>
                                     <button onClick={() => copyText(item.answer)}>
                                         복사

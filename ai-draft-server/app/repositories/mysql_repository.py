@@ -5,7 +5,7 @@ from typing import Any
 from app.core.config import (
     MYSQL_CHARSET,
     MYSQL_DATABASE,
-    MYSQL_HOST,
+    MYSQL_HOST,    
     MYSQL_PASSWORD,
     MYSQL_PORT,
     MYSQL_SOURCE_POSTED_DATE_FROM,
