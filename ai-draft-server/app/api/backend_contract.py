@@ -205,7 +205,7 @@ def normalize_answer_for_dedup(answer: str) -> str:
     )
 
 
-SIMILAR_HISTORY_MIN_SCORE = 0.50
+SIMILAR_HISTORY_MIN_SCORE = 0.5
 
 
 @router.post("/rag/similar-histories", response_model=SimilarHistoryResponse)
