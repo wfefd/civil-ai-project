@@ -40,9 +40,16 @@ function AdminInquiryDetail({ onUpdated }) {
         try {
             setSimilarLoading(true);
 
+            const start = performance.now();
+
             const response = await api.get(
                 `/api/inquiries/${inquiryId}/similar-answers`
             );
+
+            const end = performance.now();
+            const elapsed = ((end - start) / 1000).toFixed(2);
+
+            console.log(`반복 민원 추천 응답 시간: ${elapsed}초`);
 
             setSimilarAnswers(response.data.results || []);
         } catch (error) {
@@ -52,7 +59,6 @@ function AdminInquiryDetail({ onUpdated }) {
             setSimilarLoading(false);
         }
     };
-
     const loadData = async () => {
         try {
             setLoading(true);
@@ -72,9 +78,16 @@ function AdminInquiryDetail({ onUpdated }) {
         try {
             setLoading(true);
 
+            const start = performance.now();
+
             const response = await api.post(
                 `/api/inquiries/${inquiryId}/ai-recommendation`
             );
+
+            const end = performance.now();
+            const elapsed = ((end - start) / 1000).toFixed(2);
+
+            console.log(`AI 답변 초안 생성 시간: ${elapsed}초`);
 
             setAiDraft(response.data);
             setFinalAnswer(response.data.draftAnswer || "");
@@ -85,7 +98,7 @@ function AdminInquiryDetail({ onUpdated }) {
                 onUpdated();
             }
 
-            alert("AI 답변 초안이 생성되었습니다.");
+            alert(`AI 답변 초안이 생성되었습니다. 소요 시간: ${elapsed}초`);
         } catch (error) {
             console.error(error);
             alert(error.response?.data?.message || "AI 초안 생성에 실패했습니다.");
