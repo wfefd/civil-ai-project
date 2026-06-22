@@ -1,549 +1,327 @@
-# 반복 민원 상담 AI 자동응답 서비스
+반복 민원 상담 AI 자동응답 시스템
 
-## 1. 프로젝트 받아오기
+금오공과대학교 학사 민원에서 반복적으로 발생하는 문의를 효율적으로 처리하기 위한 RAG 기반 AI 답변 지원 시스템입니다.
 
-GitHub 저장소를 처음 받는 경우 아래 명령어를 실행합니다.
+학생이 문의를 등록하면 관리자는 AI 답변 초안과 과거 유사 답변을 참고하여 최종 답변을 작성할 수 있습니다. 최종 답변은 관리자의 검토와 승인을 거쳐 학생에게 제공되며, 이후 ChromaDB에 HISTORY 데이터로 적재되어 반복 민원 추천에 재활용됩니다.
 
-```powershell
-cd C:\Users\gudrb
+본 시스템은 AI가 최종 답변을 자동 확정하는 구조가 아니라, AI가 답변 초안을 생성하고 교직원이 검토·승인하는 반자동 민원 처리 지원 시스템입니다.
+
+1. 프로젝트 개요
+
+대학 행정 민원에서는 수강신청, 등록금, 장학금, 휴복학, 졸업, 식당 등 유사한 문의가 반복적으로 발생합니다. 기존 FAQ 검색이나 규칙 기반 챗봇은 표현이 달라지거나 오타가 포함된 질문에 대응하기 어렵고, 교직원이 반복적으로 같은 답변을 작성해야 하는 문제가 있습니다.
+
+본 프로젝트는 학교 공지사항, QnA, 과거 최종 답변 이력을 AI 검색 데이터로 활용하여 다음 기능을 제공합니다.
+
+학생 문의 등록
+학생 본인 문의 및 답변 조회
+관리자 전체 문의 조회
+AI 답변 초안 생성
+과거 유사 답변 추천
+최종 답변 승인
+최종 답변 HISTORY 적재
+공지사항 및 QnA 크롤링
+ChromaDB 기반 유사도 검색
+Gemini API 기반 답변 초안 생성
+2. 주요 기능
+학생 기능
+회원가입 및 로그인
+문의 등록
+본인이 작성한 문의 목록 조회
+문의 상세 및 최종 답변 확인
+JWT 기반 본인 문의 접근 제한
+관리자 기능
+전체 문의 목록 조회
+문의 상세 조회
+AI 답변 초안 생성
+반복 민원 유사 답변 추천
+최종 답변 작성 및 승인
+문의 상태 관리
+AI 기능
+사용자 문의 전처리
+jamo 기반 도메인 오타 보정
+BGE-M3 임베딩 모델 기반 벡터 변환
+ChromaDB 유사 문서 검색
+Gemini API 기반 AI 답변 초안 생성
+HISTORY 기반 반복 민원 추천
+크롤링 기능
+학교 공지사항 크롤링
+QnA 게시글 크롤링
+QnA 댓글 API 답변 데이터 수집
+PDF, DOCX, HWPX 등 첨부파일 텍스트 추출
+articleNo 및 정규화 URL 기반 중복 저장 방지
+키워드 기반 카테고리 자동 분류
+3. 시스템 구조
+civil-ai-project
+├─ frontend          # React 프론트엔드
+├─ backend           # Spring Boot 백엔드
+├─ ai-draft-server   # FastAPI AI 서버
+├─ README.md
+└─ .gitignore
+전체 흐름
+학생 문의 등록
+↓
+React Frontend
+↓
+Spring Boot Backend
+↓
+MySQL에 문의 저장
+↓
+관리자 AI 초안 생성 요청
+↓
+FastAPI AI Server
+↓
+질문 전처리 및 오타 보정
+↓
+BGE-M3 임베딩
+↓
+ChromaDB에서 NOTICE / QNA / HISTORY 검색
+↓
+검색 문서 + 사용자 질문을 Gemini API에 전달
+↓
+AI 답변 초안 생성
+↓
+관리자 검토 및 최종 답변 승인
+↓
+MySQL AnswerHistory 저장
+↓
+ChromaDB HISTORY 적재
+↓
+반복 민원 추천에 재활용
+4. 기술 스택
+영역	기술
+Frontend	React, JavaScript, CSS
+Backend	Java 17, Spring Boot, Spring Security, JWT, Spring Data JPA
+Database	MySQL
+AI Server	Python, FastAPI, Uvicorn
+Vector DB	ChromaDB
+Embedding	BGE-M3, sentence-transformers
+LLM	Gemini API
+Crawling	Jsoup
+Typo Correction	jamo
+API Test	Swagger UI, FastAPI Docs, Postman
+5. AI 서버 의존성 관리
+
+AI 서버는 Python 패키지를 requirements.txt로 관리합니다.
+
+ai-draft-server/requirements.txt 파일을 생성한 뒤 아래 내용을 추가합니다.
+
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+
+chromadb
+sentence-transformers
+torch
+
+google-generativeai
+
+jamo
+numpy
+requests
+
+설치 명령어는 다음과 같습니다.
+
+cd ai-draft-server
+
+python -m venv .venv
+
+Windows PowerShell:
+
+.\.venv\Scripts\activate
+
+macOS/Linux:
+
+source .venv/bin/activate
+
+의존성 설치:
+
+pip install -r requirements.txt
+
+Gemini API 연동 코드에서 google-genai 패키지를 사용하고 있다면 google-generativeai 대신 google-genai를 사용해야 합니다.
+
+6. 실행 방법
+6.1 프로젝트 clone
 git clone https://github.com/wfefd/civil-ai-project.git
 cd civil-ai-project
-```
+6.2 MySQL 데이터베이스 생성
 
-이미 저장소를 받아온 상태라면 최신 코드를 가져옵니다.
+MySQL에서 아래 SQL을 실행합니다.
 
-```powershell
-git pull
-```
-
----
-
-## 2. 프로젝트 개요
-
-금오공과대학교 학사 공지 및 반복 민원 데이터를 기반으로, 사용자의 질문에 대해 AI가 답변 초안을 생성하고 교직원이 검토 및 승인한 뒤 최종 답변을 제공하는 반자동 상담 지원 시스템입니다.
-
-현재는 Spring Boot와 FastAPI 연동 구조를 중심으로 구현되어 있습니다.
-
-향후에는 ChromaDB, 임베딩 모델, LLM을 연결하여 RAG 기반 답변 생성 시스템으로 확장할 예정입니다.
-
----
-
-## 3. 프로젝트 구조
-
-```text
-civil-ai-project
-├─ backend       # Spring Boot 서버
-├─ ai-server     # FastAPI AI 서버
-├─ .gitignore
-└─ README.md
-```
-
-### backend
-
-Spring Boot 기반 백엔드 서버입니다.
-
-주요 역할:
-
-```text
-사용자 문의 등록
-문의 조회
-문의 상태 관리
-FastAPI AI 서버 호출
-AI 답변 초안 저장
-최종 답변 승인 및 저장
-```
-
-### ai-server
-
-FastAPI 기반 AI 서버입니다.
-
-현재는 실제 RAG가 아닌 임시 AI 답변 초안 생성 로직을 제공합니다.
-
-향후 역할:
-
-```text
-공지/FAQ 데이터 전처리
-문서 chunk 분할
-metadata 생성
-embedding 생성
-ChromaDB 저장
-RAG 기반 유사 문서 검색
-LLM 기반 답변 생성
-```
-
----
-
-## 4. 기술 스택
-
-### Backend
-
-- Java 17
-- Spring Boot
-- Spring Data JPA
-- MySQL
-- Gradle
-- Springdoc OpenAPI / Swagger UI
-
-### AI Server
-
-- Python
-- FastAPI
-- Uvicorn
-- ChromaDB 예정
-- sentence-transformers 예정
-- LLM 연동 예정
-
----
-
-## 5. 현재 구현된 기능
-
-### Spring Boot
-
-- 사용자 문의 등록
-- 문의 목록 조회
-- 문의 상세 조회
-- 문의 상태 변경
-- FastAPI AI 서버 호출
-- AI 답변 초안 저장
-- 최종 답변 승인 및 저장
-- Swagger UI를 통한 API 테스트 지원
-
-### FastAPI
-
-- AI 서버 상태 확인
-- 질문 기반 임시 답변 초안 생성
-- Spring Boot 연동용 API 제공
-- FastAPI `/docs`를 통한 API 테스트 지원
-
----
-
-## 6. 실행 방법
-
-### 6.1 MySQL DB 생성
-
-MySQL Workbench 또는 터미널에서 아래 SQL을 실행합니다.
-
-```sql
 CREATE DATABASE civil_ai
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
-```
+6.3 Backend 설정
 
----
+backend/src/main/resources/application.yml 또는 별도 설정 파일에 DB, JWT, AI 서버 주소를 설정합니다.
 
-### 6.2 FastAPI 실행
+예시:
 
-프로젝트 최상위 폴더에서 실행합니다.
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/civil_ai?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: your_mysql_password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
 
-```powershell
-cd ai-server
-python -m venv venv
-venv\Scripts\activate
+ai:
+  server:
+    url: http://localhost:8000
+
+jwt:
+  secret: civilai-jwt-secret-key-civilai-jwt-secret-key-123456
+  access-token-valid-time: 7200000
+
+crawler:
+  qna-cookie: your_qna_login_cookie
+
+qna-cookie는 QnA 게시판 접근이 필요한 경우 설정합니다. 개인 로그인 쿠키나 API 키는 GitHub에 올리지 않아야 합니다.
+
+6.4 AI Server 실행
+cd ai-draft-server
+
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
+
 uvicorn main:app --reload --port 8000
-```
 
-FastAPI 서버 주소:
+macOS/Linux에서는 가상환경 활성화 명령어만 아래처럼 사용합니다.
 
-```text
+source .venv/bin/activate
+
+AI 서버 주소:
+
 http://localhost:8000
-```
 
-FastAPI 문서 확인:
+FastAPI 문서:
 
-```text
 http://localhost:8000/docs
-```
-
----
-
-### 6.3 Spring Boot 실행
-
-프로젝트 최상위 폴더에서 실행합니다.
-
-```powershell
+6.5 Backend 실행
 cd backend
 .\gradlew bootRun
-```
 
-또는 IntelliJ에서 `CivilAiApplication`을 실행합니다.
+macOS/Linux:
+
+./gradlew bootRun
 
 Spring Boot 서버 주소:
 
-```text
 http://localhost:8080
-```
 
----
+Swagger UI:
 
-## 7. API 문서 확인 방법
-
-### 7.1 FastAPI API 문서
-
-FastAPI 서버 실행 후 아래 주소로 접속합니다.
-
-```text
-http://localhost:8000/docs
-```
-
-FastAPI 내부 API를 직접 테스트할 수 있습니다.
-
-현재 `/docs` 테스트는 Spring Boot와 상관없이 FastAPI 단독 동작을 확인하는 용도입니다.
-
----
-
-### 7.2 Spring Boot API 문서
-
-Spring Boot 서버 실행 후 아래 주소로 접속합니다.
-
-```text
-http://localhost:8080/swagger-ui.html
-```
-
-또는 아래 주소로 접속할 수 있습니다.
-
-```text
 http://localhost:8080/swagger-ui/index.html
-```
 
-Springdoc 설정에서 Swagger UI 경로를 `/docs`로 변경한 경우 아래 주소를 사용합니다.
+또는 설정에 따라:
 
-```text
 http://localhost:8080/docs
-```
+6.6 Frontend 실행
+cd frontend
+npm install
+npm run dev
+
+프론트엔드 개발 서버 주소:
+
+http://localhost:5173
+7. 실행 순서 요약
+
+처음 실행할 때는 아래 순서를 권장합니다.
+
+1. MySQL DB 생성
+2. AI Server 실행
+3. Backend 실행
+4. Frontend 실행
+5. 회원가입 및 로그인
+6. 학생 문의 등록
+7. 관리자 AI 초안 생성 및 최종 답변 승인
+8. 주요 API
+Auth
+Method	URL	설명
+POST	/api/auth/signup	회원가입
+POST	/api/auth/login	로그인
+GET	/api/auth/me	현재 로그인 사용자 조회
+Inquiry
+Method	URL	설명
+POST	/api/inquiries	학생 문의 등록
+GET	/api/inquiries/my	학생 본인 문의 목록 조회
+GET	/api/inquiries	관리자 전체 문의 조회
+GET	/api/inquiries/{inquiryId}	문의 상세 조회
+PATCH	/api/inquiries/{inquiryId}/status	문의 상태 변경
+AI Recommendation
+Method	URL	설명
+POST	/api/inquiries/{inquiryId}/ai-recommendation	AI 답변 초안 생성
+GET	/api/inquiries/{inquiryId}/ai-recommendation	AI 답변 초안 조회
+GET	/api/inquiries/{inquiryId}/similar-answers	반복 민원 유사 답변 추천
+Answer
+Method	URL	설명
+POST	/api/inquiries/{inquiryId}/answers/approve	최종 답변 승인
+GET	/api/inquiries/{inquiryId}/answers	최종 답변 조회
+9. ChromaDB 저장 구조
+
+ChromaDB에는 NOTICE, QNA, HISTORY 데이터가 저장됩니다.
+
+source_type	설명	활용
+NOTICE	학교 공지사항	AI 답변 초안 참고
+QNA	학교 QnA 데이터	AI 답변 초안 참고
+HISTORY	관리자가 승인한 과거 최종 답변	반복 민원 추천 및 AI 초안 참고
+NOTICE
+
+공지사항 본문 content를 chunk 단위로 나누어 저장합니다.
+
+id: NOTICE-{id}-CHUNK-{index}
+
+document:
+  Source Type: NOTICE
+  Category: 수업
+  Title: 공지사항 제목
+  Content Chunk: 공지사항 본문 일부
+  Keywords: 수업, 보강, 학사일정
+QNA
+
+QnA 답변 데이터를 chunk 단위로 나누어 저장합니다.
+
+id: QNA-{id}-CHUNK-{index}
+
+document:
+  Source Type: QNA
+  Category: 수강신청
+  Question: 질문 제목
+  Answer Chunk: 답변 내용 일부
+  Keywords: 수강신청, 정정기간
+HISTORY
+
+HISTORY는 chunk로 나누지 않고 질문-답변 한 쌍을 하나의 문서로 저장합니다.
+
+유사도 비교에는 질문 중심 document를 사용하고, 실제 답변은 metadata에 저장합니다.
+
+id: HISTORY-{id}
+
+document:
+  Source Type: HISTORY
+  Category: 수업
+  Question: 계절학기 신청 기간이 언제인가요?
+
+metadata:
+  source_type: HISTORY
+  question: 계절학기 신청 기간이 언제인가요?
+  answer: 관리자가 승인한 최종 답변
+10. 향후 개선 과제
+AI 답변 초안 생성 속도 개선
+비동기 처리 및 프롬프트 최적화
+반복 민원 추천 정확도 개선
+카테고리 필터링 및 최소 유사도 임계값 적용
+Spring Scheduler 기반 자동 크롤링
+실제 교직원 답변 이력 데이터 확장
+관리자 계정 사전 승인 방식 적용
+운영 환경 배포 및 로그 모니터링 개선
+11. 프로젝트 의의
+
+본 프로젝트는 단순 문의 게시판이 아니라, 학교 공지사항과 QnA, 과거 답변 이력을 AI 검색 데이터로 활용하는 민원 처리 지원 시스템입니다.
 
-OpenAPI JSON 원본은 아래 주소에서 확인할 수 있습니다.
-
-```text
-http://localhost:8080/v3/api-docs
-```
-
----
-
-## 8. 주요 API
-
-### 8.1 문의 등록
-
-```http
-POST http://localhost:8080/api/inquiries
-Content-Type: application/json
-```
-
-```json
-{
-  "studentName": "김형규",
-  "studentNumber": "20200369",
-  "content": "등록금 추가 납부 기간이 언제인가요?"
-}
-```
-
----
-
-### 8.2 문의 목록 조회
-
-```http
-GET http://localhost:8080/api/inquiries
-```
-
----
-
-### 8.3 문의 상세 조회
-
-```http
-GET http://localhost:8080/api/inquiries/{inquiryId}
-```
-
----
-
-### 8.4 문의 상태 변경
-
-```http
-PATCH http://localhost:8080/api/inquiries/{inquiryId}/status
-Content-Type: application/json
-```
-
-```json
-{
-  "status": "AI_DRAFTED"
-}
-```
-
----
-
-### 8.5 AI 답변 초안 생성
-
-```http
-POST http://localhost:8080/api/inquiries/{inquiryId}/ai-recommendation
-```
-
----
-
-### 8.6 AI 답변 초안 조회
-
-```http
-GET http://localhost:8080/api/inquiries/{inquiryId}/ai-recommendation
-```
-
----
-
-### 8.7 최종 답변 승인
-
-```http
-POST http://localhost:8080/api/inquiries/{inquiryId}/answers/approve
-Content-Type: application/json
-```
-
-```json
-{
-  "finalAnswer": "관리자가 검토 후 작성한 최종 답변입니다.",
-  "reviewerName": "교직원A"
-}
-```
-
----
-
-### 8.8 최종 답변 조회
-
-```http
-GET http://localhost:8080/api/inquiries/{inquiryId}/answers
-```
-
----
-
-## 9. 현재 시스템 흐름
-
-```text
-사용자 문의 등록
-↓
-Spring Boot가 MySQL에 문의 저장
-↓
-Spring Boot가 FastAPI AI 서버 호출
-↓
-FastAPI가 답변 초안 반환
-↓
-Spring Boot가 AI 초안 저장
-↓
-문의 상태 AI_DRAFTED로 변경
-↓
-교직원이 초안 검토 및 승인
-↓
-최종 답변 저장
-↓
-문의 상태 COMPLETED로 변경
-↓
-사용자에게 최종 답변 제공
-```
-
----
-
-## 10. 문의 상태 흐름
-
-```text
-RECEIVED
-↓
-AI_DRAFTED
-↓
-COMPLETED
-```
-
-### 상태 설명
-
-| 상태 | 설명 |
-|---|---|
-| `RECEIVED` | 사용자가 문의를 등록한 상태 |
-| `AI_DRAFTED` | AI 답변 초안이 생성된 상태 |
-| `COMPLETED` | 관리자가 최종 답변을 승인한 상태 |
-
----
-
-## 11. FastAPI 현재 동작 범위
-
-현재 FastAPI의 AI 서버는 실제 RAG 시스템이 아닙니다.
-
-현재 동작:
-
-```text
-질문 입력
-↓
-키워드 기반 카테고리 분류
-↓
-임시 답변 초안 생성
-↓
-Spring Boot로 응답 반환
-```
-
-아직 구현되지 않은 기능:
-
-```text
-ChromaDB 검색
-임베딩 생성
-문서 chunk 검색
-metadata 기반 출처 제공
-LLM 기반 답변 생성
-```
-
-즉, 현재 FastAPI 서버는 Spring Boot와 AI 서버 간 연동 구조를 검증하기 위한 임시 AI 서버입니다.
-
----
-
-## 12. 향후 RAG 시스템 구조
-
-추후 RAG 시스템은 다음 흐름으로 확장할 예정입니다.
-
-```text
-크롤링 데이터
-↓
-전처리
-↓
-chunk 분할
-↓
-metadata 생성
-↓
-embedding 생성
-↓
-ChromaDB 저장
-```
-
-질문이 들어오면:
-
-```text
-사용자 질문
-↓
-Spring Boot
-↓
-FastAPI AI 서버
-↓
-ChromaDB 유사 문서 검색
-↓
-검색 결과를 context로 구성
-↓
-LLM 답변 생성
-↓
-Spring Boot로 반환
-↓
-MySQL에 답변 저장
-```
-
----
-
-## 13. 저장소 역할 구분
-
-| 저장소 | 역할 |
-|---|---|
-| MySQL | 사용자 문의, AI 초안, 최종 답변 등 서비스 데이터 저장 |
-| ChromaDB | 검색용 chunk, embedding, metadata 저장 |
-| GitHub | 프로젝트 소스 코드 관리 |
-
-AI가 생성한 답변 초안과 최종 답변은 ChromaDB가 아니라 MySQL에 저장합니다.
-
-ChromaDB는 답변을 저장하는 곳이 아니라, 질문과 관련된 문서를 찾기 위한 벡터 검색 저장소입니다.
-
----
-
-## 14. Git 초기화 및 첫 커밋
-
-새 프로젝트를 처음 Git 저장소로 만들 경우 프로젝트 최상단 폴더에서 실행합니다.
-
-```powershell
-cd C:\Users\gudrb\civil-ai-project
-git init
-git add .
-git commit -m "Initial project structure with Spring Boot and FastAPI"
-```
-
-Git 사용자 설정이 되어 있지 않으면 아래 명령어를 먼저 실행합니다.
-
-```powershell
-git config --global user.name "김형규"
-git config --global user.email "your-github-email@example.com"
-```
-
-그 후 다시 커밋합니다.
-
-```powershell
-git commit -m "Initial project structure with Spring Boot and FastAPI"
-```
-
----
-
-## 15. GitHub 원격 저장소 연결
-
-GitHub에 빈 저장소를 만든 뒤 아래 명령어로 원격 저장소를 연결합니다.
-
-```powershell
-git remote add origin https://github.com/wfefd/civil-ai-project.git
-git branch -M main
-git push -u origin main
-```
-
-이미 원격 저장소가 연결되어 있는지 확인하려면 아래 명령어를 실행합니다.
-
-```powershell
-git remote -v
-```
-
----
-
-## 16. 폴더 구조 변경 후 Git 반영
-
-폴더 구조를 정리한 뒤에는 아래 명령어를 실행합니다.
-
-```powershell
-cd C:\Users\gudrb\civil-ai-project
-git status
-git add .
-git commit -m "Restructure project directories"
-git push
-```
-
----
-
-## 17. 주의 사항
-
-아래 파일과 폴더는 Git에 올리지 않습니다.
-
-```text
-.venv/
-venv/
-__pycache__/
-chroma_db/
-.env
-build/
-.gradle/
-.idea/
-```
-
-해당 항목들은 `.gitignore`에 추가하여 관리합니다.
-
----
-
-## 18. 실행 순서 요약
-
-처음 실행할 때는 아래 순서를 따릅니다.
-
-```text
-1. GitHub 저장소 clone
-2. MySQL DB 생성
-3. FastAPI 서버 실행
-4. Spring Boot 서버 실행
-5. Swagger UI 또는 Postman으로 API 테스트
-```
-
-FastAPI와 Spring Boot는 각각 다른 포트에서 실행됩니다.
-
-```text
-FastAPI      : http://localhost:8000
-Spring Boot  : http://localhost:8080
-```
-
----
-
-## 19. 다음 개발 예정
-
-- AI 초안 중복 생성 방지
-- 최종 답변 중복 승인 방지
-- ChromaDB 연동
-- 공지/FAQ 문서 저장 API 구현
-- RAG 기반 유사 문서 검색
-- LLM 기반 답변 생성
-- React 프론트엔드 구현
+AI가 답변을 자동으로 확정하지 않고, 관리자가 검토하고 승인하는 구조를 유지함으로써 행정 답변의 책임성과 신뢰성을 확보하고자 하였습니다.
